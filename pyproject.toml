@@ -1,13 +1,12 @@
 [project]
 name = "fastjsonl"
 version = "0.1.0"
-description = "Add your description here"
+description = "Blazingly fast jsonl parser and validator."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
     { name = "Wilhelm Ågren", email = "wilhelm@firelink.sh" },
 ]
-dynamic = ["version"]
 dependencies = []
 
 [build-system]
@@ -15,5 +14,12 @@ requires = ["maturin>=1.9,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
+manifest-path = "rust/Cargo.toml"
 features = ["pyo3/extension-module"]
+
+[dependency-groups]
+dev = [
+    "maturin>=1.9.6",
+    "pytest>=8.4.2",
+]
 

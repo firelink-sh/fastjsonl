@@ -1,11 +1,11 @@
 [package]
-name = "rust"
+name = "fastjsonl_core"
 version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "fastjonl"
+name = "fastjsonl_core"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.26.0"
+pyo3 = { version = "0.26.0", features = ["extension-module"] }
