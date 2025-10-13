@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UserData",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "integer"
+    },
+    "username": {
+      "type": "string"
+    },
+    "last_login": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "banned": {
+      "type": "boolean"
+    },
+    "friends": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "integer"
+          },
+          "username": {
+            "type": "string"
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["user_id", "username"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["user_id", "username", "last_login", "banned", "friends"],
+  "additionalProperties": false
+}
+

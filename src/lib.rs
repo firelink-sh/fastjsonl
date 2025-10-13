@@ -1,19 +1,13 @@
-use std::io::{BufRead, BufReader};
-
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyString};
+
+use jsonschema;
 use serde_json::Value;
+use std::io::{BufRead, BufReader};
 
 #[pyfunction]
-fn count_newlines(data: &Bound<PyBytes>) -> PyResult<usize> {
-    let slice: &[u8] = data.as_bytes();
-    let count = slice.iter().filter(|&&b| b == b'\n').count();
-    Ok(count)
-}
-
-#[pyfunction]
-fn greet(name: &str) -> PyResult<String> {
-    Ok(format!("Hello {} from Rust!", name))
+fn validate_ndjson(buffer: &Bound<PyBytes>, schema_str: &Bound<PyString>) -> PyResult<()> {
+    validate_jsonl(buffer, schema_str)
 }
 
 #[pyfunction]
@@ -59,8 +53,6 @@ fn validate_jsonl(buffer: &Bound<PyBytes>, schema_str: &Bound<PyString>) -> PyRe
         }
     }
 
-    println!("Data OK!");
-
     drop(json_schema);
     drop(validator);
 
@@ -69,8 +61,7 @@ fn validate_jsonl(buffer: &Bound<PyBytes>, schema_str: &Bound<PyString>) -> PyRe
 
 #[pymodule]
 fn fastjsonl(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(greet, m)?)?;
-    m.add_function(wrap_pyfunction!(count_newlines, m)?)?;
     m.add_function(wrap_pyfunction!(validate_jsonl, m)?)?;
+    m.add_function(wrap_pyfunction!(validate_ndjson, m)?)?;
     Ok(())
 }
