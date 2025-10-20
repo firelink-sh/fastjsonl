@@ -1,4 +1,7 @@
-use arrow::array::{Int8Builder, Int16Builder, Int32Builder, Int64Builder, LargeStringBuilder};
+use arrow::array::{
+    BooleanBuilder, Float16Builder, Float32Builder, Float64Builder, Int8Builder, Int16Builder,
+    Int32Builder, Int64Builder, LargeStringBuilder,
+};
 use arrow::datatypes::{DataType, SchemaRef};
 use arrow_array::builder::{ArrayBuilder, StringBuilder};
 use arrow_array::{Array, RecordBatch};
@@ -12,8 +15,100 @@ use serde_json::Value;
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
+fn append_json_value(builder: &mut Box<dyn ArrayBuilder>, dtype: &DataType, value: Option<&Value>) {
+    match dtype {
+        DataType::Int8 => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<Int8Builder>()
+                .expect("could not downcast builder to Int8Builder");
+            match value {
+                Some(v) => b.append_value(v.as_i64().unwrap() as i8),
+                None => b.append_null(),
+            }
+        }
+        DataType::Int16 => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<Int16Builder>()
+                .expect("could not downcast builder to Int16Builder");
+            match value {
+                Some(v) => b.append_value(v.as_i64().unwrap() as i16),
+                None => b.append_null(),
+            }
+        }
+        DataType::Int32 => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<Int32Builder>()
+                .expect("could not downcast builder to Int32Builder");
+            match value {
+                Some(v) => b.append_value(v.as_i64().unwrap() as i32),
+                None => b.append_null(),
+            }
+        }
+        DataType::Int64 => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<Int64Builder>()
+                .expect("could not downcast builder to Int64Builder");
+            match value {
+                Some(v) => b.append_value(v.as_i64().unwrap()),
+                None => b.append_null(),
+            }
+        }
+        DataType::Utf8 => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<StringBuilder>()
+                .expect("could not downcast builder to StringBuilder");
+            match value {
+                Some(v) => {
+                    if let Some(s) = v.as_str() {
+                        b.append_value(s);
+                    } else {
+                        // If the json value is not actually a string, we can
+                        // serialize it to utf8 using serde-json
+                        b.append_value(serde_json::to_string(v).unwrap());
+                    };
+                }
+                None => b.append_null(),
+            }
+        }
+        DataType::LargeUtf8 => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<LargeStringBuilder>()
+                .expect("could not downcast builder to LargeStringBuilder");
+            match value {
+                Some(v) => {
+                    if let Some(s) = v.as_str() {
+                        b.append_value(s);
+                    } else {
+                        b.append_value(serde_json::to_string(v).unwrap());
+                    };
+                }
+                None => b.append_null(),
+            }
+        }
+        DataType::Boolean => {
+            let b = builder
+                .as_any_mut()
+                .downcast_mut::<BooleanBuilder>()
+                .expect("could not downcast builder to BooleanBuilder");
+            match value {
+                Some(v) => b.append_value(v.as_bool().unwrap()),
+                None => b.append_null(),
+            }
+        }
+        _ => {
+            panic!("unsupported datatype: {:?}", dtype);
+        }
+    }
+}
+
 #[pyfunction]
-fn test(
+fn jsonl_to_arrow(
     buffer: &Bound<PyBytes>,
     json_schema_str: &Bound<PyString>,
     pyarrow_schema: PySchema,
@@ -30,7 +125,7 @@ fn test(
     })?;
 
     let schema: SchemaRef = pyarrow_schema.into_inner();
-    let mut column_builders: Vec<Box<dyn ArrayBuilder>> = schema
+    let mut builders: Vec<Box<dyn ArrayBuilder>> = schema
         .fields()
         .iter()
         .map(|field| match field.data_type() {
@@ -38,8 +133,12 @@ fn test(
             DataType::Int16 => Box::new(Int16Builder::new()) as Box<dyn ArrayBuilder>,
             DataType::Int32 => Box::new(Int32Builder::new()) as Box<dyn ArrayBuilder>,
             DataType::Int64 => Box::new(Int64Builder::new()) as Box<dyn ArrayBuilder>,
+            DataType::Float16 => Box::new(Float16Builder::new()) as Box<dyn ArrayBuilder>,
+            DataType::Float32 => Box::new(Float32Builder::new()) as Box<dyn ArrayBuilder>,
+            DataType::Float64 => Box::new(Float64Builder::new()) as Box<dyn ArrayBuilder>,
             DataType::Utf8 => Box::new(StringBuilder::new()) as Box<dyn ArrayBuilder>,
             DataType::LargeUtf8 => Box::new(LargeStringBuilder::new()) as Box<dyn ArrayBuilder>,
+            DataType::Boolean => Box::new(BooleanBuilder::new()) as Box<dyn ArrayBuilder>,
             dtype => panic!("unsupported datatype: {:?}", dtype),
         })
         .collect();
@@ -60,57 +159,16 @@ fn test(
             panic!("validation error (row {}): {}", i, e)
         };
 
-        println!("LINE: {}", line);
-        println!("JSON: {}", json);
-
         for (j, field) in schema.fields().iter().enumerate() {
             let key: &str = field.name();
             let value = json.get(key);
-
-            println!("{}: {}", key, value.unwrap());
-
-            match (column_builders[j].as_any_mut(), field.data_type(), value) {
-                (builder, DataType::Int64, Some(v)) => {
-                    println!("row={} col={} BUILDER: {:?}", i, j, builder);
-                    let b = builder
-                        .downcast_mut::<Int64Builder>()
-                        .expect("could not downcast builder to in64");
-                    if let Some(n) = v.as_i64() {
-                        b.append_value(n);
-                    } else {
-                        b.append_null();
-                    }
-                }
-                (builder, DataType::Utf8, Some(v)) => {
-                    println!("row={} col={} BUILDER: {:?}", i, j, builder);
-                    let b = builder
-                        .downcast_mut::<StringBuilder>()
-                        .expect("could not downcast builder to string");
-                    if let Some(n) = v.as_str() {
-                        b.append_value(n);
-                    } else {
-                        b.append_null();
-                    }
-                }
-                (builder, DataType::LargeUtf8, Some(v)) => {
-                    println!("row={} col={} BUILDER: {:?}", i, j, builder);
-                    let b = builder
-                        .downcast_mut::<LargeStringBuilder>()
-                        .expect("could not downcast builder to LargeString");
-                    if let Some(n) = v.as_str() {
-                        b.append_value(n);
-                    } else {
-                        b.append_null();
-                    }
-                }
-                (_, _, None) => {}
-                _ => panic!("type mismatch for field '{}'", field),
-            };
+            // println!("row {} col {} '{}': '{:?}'", i, j, key, value);
+            append_json_value(&mut builders[j], field.data_type(), value);
         }
     }
 
     // Finish the builders into recordbatch eatable arrays :) yummy!
-    let columns: Vec<Arc<dyn Array>> = column_builders
+    let columns: Vec<Arc<dyn Array>> = builders
         .into_iter()
         .map(|mut cb| cb.finish())
         .map(Arc::from)
@@ -168,9 +226,6 @@ fn validate_jsonl(buffer: &Bound<PyBytes>, schema_str: &Bound<PyString>) -> PyRe
         }
     }
 
-    drop(json_schema);
-    drop(validator);
-
     Ok(())
 }
 
@@ -178,6 +233,6 @@ fn validate_jsonl(buffer: &Bound<PyBytes>, schema_str: &Bound<PyString>) -> PyRe
 fn fastjsonl(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(validate_jsonl, m)?)?;
     m.add_function(wrap_pyfunction!(validate_ndjson, m)?)?;
-    m.add_function(wrap_pyfunction!(test, m)?)?;
+    m.add_function(wrap_pyfunction!(jsonl_to_arrow, m)?)?;
     Ok(())
 }
