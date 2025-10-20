@@ -1,9 +1,25 @@
+use arrow_array::RecordBatch;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyString};
 
 use jsonschema;
+use pyo3_arrow::error::PyArrowResult;
+use pyo3_arrow::{PyArray, PyRecordBatch, PySchema};
 use serde_json::Value;
 use std::io::{BufRead, BufReader};
+
+#[pyfunction]
+fn test(
+    py: Python,
+    buffer: &Bound<PyBytes>,
+    json_schema_str: &Bound<PyString>,
+    arrow_schema: PySchema,
+) -> PyArrowResult<PyRecordBatch> {
+    println!("ARROW SCHEMA FROM PYTHON: {:?}", arrow_schema);
+
+    let rb = RecordBatch::new_empty(arrow_schema.into());
+    Ok(rb.into())
+}
 
 #[pyfunction]
 fn validate_ndjson(buffer: &Bound<PyBytes>, schema_str: &Bound<PyString>) -> PyResult<()> {
@@ -63,5 +79,6 @@ fn validate_jsonl(buffer: &Bound<PyBytes>, schema_str: &Bound<PyString>) -> PyRe
 fn fastjsonl(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(validate_jsonl, m)?)?;
     m.add_function(wrap_pyfunction!(validate_ndjson, m)?)?;
+    m.add_function(wrap_pyfunction!(test, m)?)?;
     Ok(())
 }
