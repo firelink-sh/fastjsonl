@@ -11,6 +11,6 @@ crate-type = ["cdylib"]
 arrow = { version = "56.2.0", features = ["ffi"] }
 jsonschema = "0.33.0"
 libc = "0.2.177"
-pyo3 = { version = "0.26.0", features = ["extension-module"] }
+pyo3 = { version = "0.27.0", features = ["extension-module"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
