@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 [dependencies]
 arrow = "56.2.0"
 arrow-array = "56.2.0"
-jsonschema = "0.33.0"
+jsonschema = "0.36.0"
 libc = "0.2.177"
 pyo3 = { version = "0.26", features = ["extension-module"] }
 pyo3-arrow = "0.12.0"
